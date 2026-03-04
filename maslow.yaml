@@ -1,0 +1,61 @@
+mas: "1.0"
+project:
+  name: seance
+  description: "seance is a simple API backed webapp that allows users to look at their local Claude code conversation history."
+
+refs:
+  - kind: file
+    path: docs/refs/vision.md
+    description: "vision for the project"
+  - kind: file
+    path: docs/refs/mvp_requirements.md
+    description: "mvp requirements for the project"
+checks:
+  runner:
+    - name: build
+      kind: command
+      run: "make build"
+      timeout: 120s
+      tags:
+        - build
+    - name: test
+      kind: command
+      run: "make test"
+      timeout: 300s
+      tags:
+        - test
+    - name: lint
+      kind: command
+      run: "make lint"
+      timeout: 60s
+      tags:
+        - lint
+    - name: self-validate
+      kind: command
+      run: "maslow validate maslow.yaml"
+      timeout: 30s
+      tags:
+        - self-host
+
+profiles:
+  quick:
+    description: Fast checks for development
+    checks:
+      - build
+      - lint
+      - self-validate
+  full:
+    description: All checks including tests
+    checks:
+      - build
+      - test
+      - lint
+      - self-validate
+
+policy:
+  deny:
+    - "**/.env"
+    - "**/credentials*"
+    - "vendor/**"
+  protected:
+    - maslow.yaml

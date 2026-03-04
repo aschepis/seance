@@ -1,0 +1,23 @@
+# Maslow reports
+reports/verify.json
+
+# Build artifacts
+bin/
+web/dist/
+
+# Node
+web/frontend/node_modules/
+
+# Environment files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
