@@ -15,17 +15,21 @@ function formatDate(dateStr) {
   return d.toLocaleDateString();
 }
 
-function ProjectGroup({ project, activeConvId, onSelectConversation }) {
-  const [expanded, setExpanded] = useState(true);
+function ProjectGroup({ project, activeConvId, onSelectConversation, hideEmpty, expanded, onToggle }) {
+  const conversations = hideEmpty
+    ? project.conversations.filter((c) => c.messageCount > 0)
+    : project.conversations;
+
+  if (conversations.length === 0) return null;
 
   return (
     <div className="project-group">
-      <div className="project-header" onClick={() => setExpanded(!expanded)}>
+      <div className="project-header" onClick={onToggle}>
         <span className={`chevron ${expanded ? 'open' : ''}`}>&#9654;</span>
         <span>{project.name}</span>
-        <span className="count">{project.conversations.length}</span>
+        <span className="count">{conversations.length}</span>
       </div>
-      {expanded && project.conversations.map((conv) => (
+      {expanded && conversations.map((conv) => (
         <div
           key={conv.id}
           className={`conversation-item ${activeConvId === conv.id ? 'active' : ''}`}
@@ -80,6 +84,28 @@ export default function Sidebar({
   loading,
 }) {
   const timerRef = useRef(null);
+  const [hideEmpty, setHideEmpty] = useState(true);
+  const [expandedMap, setExpandedMap] = useState({});
+
+  function isExpanded(path) {
+    return expandedMap[path] !== false;
+  }
+
+  function toggleProject(path) {
+    setExpandedMap((prev) => ({ ...prev, [path]: !isExpanded(path) }));
+  }
+
+  function expandAll() {
+    const next = {};
+    projects.forEach((p) => { next[p.path] = true; });
+    setExpandedMap(next);
+  }
+
+  function collapseAll() {
+    const next = {};
+    projects.forEach((p) => { next[p.path] = false; });
+    setExpandedMap(next);
+  }
 
   function handleSearchInput(e) {
     const value = e.target.value;
@@ -99,6 +125,20 @@ export default function Sidebar({
             onChange={handleSearchInput}
           />
         </div>
+        <div className="sidebar-controls">
+          <label className="hide-empty-toggle">
+            <input
+              type="checkbox"
+              checked={hideEmpty}
+              onChange={(e) => setHideEmpty(e.target.checked)}
+            />
+            Hide empty
+          </label>
+          <div className="expand-collapse-btns">
+            <button onClick={expandAll}>expand all</button>
+            <button onClick={collapseAll}>collapse all</button>
+          </div>
+        </div>
       </div>
       <div className="sidebar-content">
         {loading ? (
@@ -112,6 +152,9 @@ export default function Sidebar({
               project={project}
               activeConvId={activeConvId}
               onSelectConversation={onSelectConversation}
+              hideEmpty={hideEmpty}
+              expanded={isExpanded(project.path)}
+              onToggle={() => toggleProject(project.path)}
             />
           ))
         )}

@@ -11,6 +11,25 @@ import (
 	"time"
 )
 
+// sessionsIndex is the structure of a sessions-index.json file written by newer Claude Code versions.
+type sessionsIndex struct {
+	Version int                 `json:"version"`
+	Entries []sessionsIndexEntry `json:"entries"`
+}
+
+type sessionsIndexEntry struct {
+	SessionID    string    `json:"sessionId"`
+	FullPath     string    `json:"fullPath"`
+	FirstPrompt  string    `json:"firstPrompt"`
+	Summary      string    `json:"summary"`
+	MessageCount int       `json:"messageCount"`
+	Created      time.Time `json:"created"`
+	Modified     time.Time `json:"modified"`
+	GitBranch    string    `json:"gitBranch"`
+	ProjectPath  string    `json:"projectPath"`
+	IsSidechain  bool      `json:"isSidechain"`
+}
+
 // rawMessage is the JSON structure of each line in a JSONL conversation file.
 type rawMessage struct {
 	Type      string          `json:"type"`
@@ -75,31 +94,66 @@ func (p *Parser) ListProjects() ([]ProjectGroup, error) {
 		}
 
 		dirName := entry.Name()
+		projDir := filepath.Join(projectsDir, dirName)
+
+		// Prefer the real path from sessions-index.json over the lossy decoded dir name.
 		projectPath := decodeProjectPath(dirName)
 		projectName := filepath.Base(projectPath)
-
-		// Find JSONL files in this project directory
-		projDir := filepath.Join(projectsDir, dirName)
-		files, err := filepath.Glob(filepath.Join(projDir, "*.jsonl"))
-		if err != nil {
-			continue
+		indexPath := filepath.Join(projDir, "sessions-index.json")
+		idx, indexErr := readSessionsIndex(indexPath)
+		if indexErr == nil {
+			for _, e := range idx.Entries {
+				if !e.IsSidechain && e.ProjectPath != "" {
+					projectPath = e.ProjectPath
+					projectName = filepath.Base(projectPath)
+					break
+				}
+			}
 		}
 
-		for _, file := range files {
-			summary, err := p.parseConversationSummary(file, projectPath)
-			if err != nil {
-				continue
-			}
+		// Track which session IDs we've already loaded from flat JSONL files.
+		seenIDs := make(map[string]bool)
 
-			group, ok := groups[projectPath]
-			if !ok {
-				group = &ProjectGroup{
-					Path: projectPath,
-					Name: projectName,
+		files, err := filepath.Glob(filepath.Join(projDir, "*.jsonl"))
+		if err == nil {
+			for _, file := range files {
+				summary, err := p.parseConversationSummary(file, projectPath)
+				if err != nil {
+					continue
 				}
-				groups[projectPath] = group
+				seenIDs[summary.ID] = true
+
+				group, ok := groups[projectPath]
+				if !ok {
+					group = &ProjectGroup{
+						Path: projectPath,
+						Name: projectName,
+					}
+					groups[projectPath] = group
+				}
+				group.Conversations = append(group.Conversations, *summary)
 			}
-			group.Conversations = append(group.Conversations, *summary)
+		}
+
+		// Newer Claude Code versions write a sessions-index.json instead of flat JSONL files.
+		// Read it to pick up any sessions not already found above.
+		if indexErr == nil {
+			for _, e := range idx.Entries {
+				if e.IsSidechain || seenIDs[e.SessionID] {
+					continue
+				}
+				summary := summaryFromIndexEntry(e, projectPath)
+
+				group, ok := groups[projectPath]
+				if !ok {
+					group = &ProjectGroup{
+						Path: projectPath,
+						Name: projectName,
+					}
+					groups[projectPath] = group
+				}
+				group.Conversations = append(group.Conversations, summary)
+			}
 		}
 	}
 
@@ -132,10 +186,35 @@ func (p *Parser) ListProjects() ([]ProjectGroup, error) {
 // GetConversation reads and parses a full conversation by ID.
 func (p *Parser) GetConversation(id string) (*Conversation, error) {
 	file, err := p.findConversationFile(id)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return p.parseConversation(file)
 	}
-	return p.parseConversation(file)
+
+	// Fall back to sessions-index.json for conversations without a flat JSONL file.
+	entry, indexErr := p.findIndexEntry(id)
+	if indexErr != nil {
+		return nil, fmt.Errorf("conversation not found: %s", id)
+	}
+
+	// If the fullPath from the index actually exists on disk, parse it.
+	if _, statErr := os.Stat(entry.FullPath); statErr == nil {
+		return p.parseConversation(entry.FullPath)
+	}
+
+	// Construct a minimal conversation from the index metadata since the JSONL is gone.
+	conv := &Conversation{
+		ID:        entry.SessionID,
+		Project:   entry.ProjectPath,
+		CWD:       entry.ProjectPath,
+		GitBranch: entry.GitBranch,
+		StartedAt: entry.Created,
+		UpdatedAt: entry.Modified,
+		Summary:   entry.FirstPrompt,
+	}
+	if conv.Summary == "" {
+		conv.Summary = entry.Summary
+	}
+	return conv, nil
 }
 
 // Search searches across all conversations for the given query.
@@ -486,6 +565,79 @@ func (p *Parser) searchInFile(file, projectPath, query string) ([]SearchResult, 
 	}
 
 	return results, nil
+}
+
+func (p *Parser) findIndexEntry(id string) (*sessionsIndexEntry, error) {
+	projectsDir := filepath.Join(p.claudeDir, "projects")
+	entries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		indexPath := filepath.Join(projectsDir, entry.Name(), "sessions-index.json")
+		idx, err := readSessionsIndex(indexPath)
+		if err != nil {
+			continue
+		}
+		for i := range idx.Entries {
+			if idx.Entries[i].SessionID == id {
+				return &idx.Entries[i], nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("not found in any sessions index: %s", id)
+}
+
+func readSessionsIndex(path string) (*sessionsIndex, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var idx sessionsIndex
+	if err := json.NewDecoder(f).Decode(&idx); err != nil {
+		return nil, err
+	}
+	return &idx, nil
+}
+
+func summaryFromIndexEntry(e sessionsIndexEntry, projectPath string) ConversationSummary {
+	text := e.FirstPrompt
+	if text == "" {
+		text = e.Summary
+	}
+	if len(text) > 200 {
+		text = text[:200] + "..."
+	}
+
+	cwd := e.ProjectPath
+	if cwd == "" {
+		cwd = projectPath
+	}
+
+	// If the JSONL file doesn't exist on disk, the conversation has no accessible
+	// messages regardless of what the index says, so report 0.
+	messageCount := e.MessageCount
+	if _, err := os.Stat(e.FullPath); err != nil {
+		messageCount = 0
+	}
+
+	return ConversationSummary{
+		ID:           e.SessionID,
+		Project:      projectPath,
+		CWD:          cwd,
+		GitBranch:    e.GitBranch,
+		StartedAt:    e.Created,
+		UpdatedAt:    e.Modified,
+		MessageCount: messageCount,
+		Summary:      text,
+	}
 }
 
 // decodeProjectPath converts a Claude projects directory name back to a path.

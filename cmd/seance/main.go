@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	port := flag.Int("port", 3333, "port to listen on")
+	port := flag.Int("port", 1692, "port to listen on")
 	claudeDir := flag.String("claude-dir", conversations.DefaultClaudeDir(), "path to Claude config directory")
 	flag.Parse()
 
