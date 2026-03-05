@@ -10,6 +10,15 @@ refs:
   - kind: file
     path: docs/refs/mvp_requirements.md
     description: "mvp requirements for the project"
+  - kind: file
+    path: README.md
+    description: "project readme with build/run instructions"
+  - kind: file
+    path: docs/adr/004-sessions-index-support.md
+    description: "ADR for sessions-index.json support"
+  - kind: file
+    path: docs/adr/005-default-port-1692.md
+    description: "ADR for default port choice"
 checks:
   runner:
     - name: build
@@ -30,6 +39,18 @@ checks:
       timeout: 60s
       tags:
         - lint
+    - name: binary-smoke
+      kind: command
+      run: |
+        ./bin/seance --port 0 &
+        PID=$!
+        sleep 1
+        kill $PID 2>/dev/null
+        wait $PID 2>/dev/null
+        exit 0
+      timeout: 10s
+      tags:
+        - smoke
     - name: self-validate
       kind: command
       run: "maslow validate maslow.yaml"
@@ -50,6 +71,7 @@ profiles:
       - build
       - test
       - lint
+      - smoke
       - self-validate
 
 policy:

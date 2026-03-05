@@ -25,6 +25,7 @@ seance is a local webapp for browsing Claude Code conversation history. It reads
 │  ┌───────────▼─────────────────────────────┐│
 │  │ Parser (internal/conversations)         ││
 │  │  Reads ~/.claude/projects/**/*.jsonl    ││
+│  │  + sessions-index.json fallback         ││
 │  └─────────────────────────────────────────┘│
 │  ┌─────────────────────────────────────────┐│
 │  │ Embedded Frontend (web/dist via embed)  ││
@@ -39,7 +40,7 @@ seance is a local webapp for browsing Claude Code conversation history. It reads
 | Path | Role |
 |------|------|
 | cmd/seance/main.go | Application entrypoint — starts HTTP server |
-| internal/conversations/parser.go | JSONL parsing and conversation discovery |
+| internal/conversations/parser.go | JSONL parsing, sessions-index.json, and conversation discovery |
 | internal/conversations/types.go | Domain types (Conversation, Message, etc.) |
 | internal/api/handler.go | HTTP API handlers |
 | web/embed.go | Embeds built frontend assets |
