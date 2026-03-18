@@ -252,6 +252,22 @@ body {
   color: var(--text-muted);
   display: flex;
   gap: 16px;
+  align-items: center;
+}
+
+.hide-tools-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  margin-left: auto;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.hide-tools-toggle input[type='checkbox'] {
+  cursor: pointer;
+  accent-color: var(--accent);
 }
 
 .messages-container {

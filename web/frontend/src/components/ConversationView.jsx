@@ -45,7 +45,7 @@ function ToolUseBlock({ block }) {
   );
 }
 
-function MessageContent({ content }) {
+function MessageContent({ content, hideTools }) {
   return (
     <div className="message-body">
       {(content || []).map((block, i) => {
@@ -53,8 +53,10 @@ function MessageContent({ content }) {
           case 'text':
             return <div key={i} className="text-content">{block.text}</div>;
           case 'thinking':
+            if (hideTools) return null;
             return <ThinkingBlock key={i} text={block.text} />;
           case 'tool_use':
+            if (hideTools) return null;
             return <ToolUseBlock key={i} block={block} />;
           default:
             return null;
@@ -64,7 +66,7 @@ function MessageContent({ content }) {
   );
 }
 
-function MessageItem({ message }) {
+function MessageItem({ message, hideTools }) {
   // User prompts expanded by default, assistant responses collapsed
   const defaultExpanded = message.role === 'user';
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -80,13 +82,21 @@ function MessageItem({ message }) {
         {!expanded && <span className="preview">{getTextPreview(message.content)}</span>}
         <span className="timestamp">{formatTime(message.timestamp)}</span>
       </div>
-      {expanded && <MessageContent content={message.content} />}
+      {expanded && <MessageContent content={message.content} hideTools={hideTools} />}
     </div>
   );
 }
 
 export default function ConversationView({ conversation }) {
-  const { messages, cwd, gitBranch, startedAt, updatedAt } = conversation;
+  const { messages, cwd, gitBranch, startedAt } = conversation;
+  const [hideTools, setHideTools] = useState(false);
+
+  const hasTextContent = (msg) =>
+    (msg.content || []).some((b) => b.type === 'text' && b.text);
+
+  const visibleMessages = hideTools
+    ? (messages || []).filter((msg) => !msg.isSubAgent && hasTextContent(msg))
+    : (messages || []);
 
   return (
     <>
@@ -97,11 +107,19 @@ export default function ConversationView({ conversation }) {
           {gitBranch && <span>branch: {gitBranch}</span>}
           <span>{new Date(startedAt).toLocaleString()}</span>
           <span>{messages?.length || 0} messages</span>
+          <label className="hide-tools-toggle">
+            <input
+              type="checkbox"
+              checked={hideTools}
+              onChange={(e) => setHideTools(e.target.checked)}
+            />
+            Hide tools &amp; sub-agents
+          </label>
         </div>
       </div>
       <div className="messages-container">
-        {(messages || []).map((msg) => (
-          <MessageItem key={msg.uuid} message={msg} />
+        {visibleMessages.map((msg) => (
+          <MessageItem key={msg.uuid} message={msg} hideTools={hideTools} />
         ))}
       </div>
     </>
