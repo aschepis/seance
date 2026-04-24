@@ -87,7 +87,7 @@ function MessageItem({ message, hideTools }) {
   );
 }
 
-export default function ConversationView({ conversation }) {
+export default function ConversationView({ conversation, onOpenSidebar }) {
   const { messages, cwd, gitBranch, startedAt } = conversation;
   const [hideTools, setHideTools] = useState(false);
 
@@ -101,9 +101,20 @@ export default function ConversationView({ conversation }) {
   return (
     <>
       <div className="conversation-header">
-        <h2>{conversation.summary || conversation.id}</h2>
+        <div className="conversation-title-row">
+          {onOpenSidebar && (
+            <button
+              className="mobile-menu-btn"
+              onClick={onOpenSidebar}
+              aria-label="Open sidebar"
+            >
+              &#9776;
+            </button>
+          )}
+          <h2>{conversation.summary || conversation.id}</h2>
+        </div>
         <div className="meta-bar">
-          <span>{cwd}</span>
+          <span className="meta-cwd">{cwd}</span>
           {gitBranch && <span>branch: {gitBranch}</span>}
           <span>{new Date(startedAt).toLocaleString()}</span>
           <span>{messages?.length || 0} messages</span>

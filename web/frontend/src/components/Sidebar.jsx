@@ -82,6 +82,7 @@ export default function Sidebar({
   onSearch,
   searchResults,
   loading,
+  onClose,
 }) {
   const timerRef = useRef(null);
   const [hideEmpty, setHideEmpty] = useState(true);
@@ -116,7 +117,18 @@ export default function Sidebar({
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h1>seance</h1>
+        <div className="sidebar-title-row">
+          <h1>seance</h1>
+          {onClose && (
+            <button
+              className="sidebar-close-btn"
+              onClick={onClose}
+              aria-label="Close sidebar"
+            >
+              &times;
+            </button>
+          )}
+        </div>
         <div className="search-box">
           <input
             type="text"

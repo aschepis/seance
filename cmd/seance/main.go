@@ -48,8 +48,13 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
-	addr := fmt.Sprintf(":%d", *port)
-	log.Printf("seance listening on http://localhost%s", addr)
+	binding := os.Getenv("BINDING")
+	addr := fmt.Sprintf("%s:%d", binding, *port)
+	displayHost := binding
+	if displayHost == "" {
+		displayHost = "localhost"
+	}
+	log.Printf("seance listening on http://%s:%d", displayHost, *port)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("error: %v", err)
 	}
