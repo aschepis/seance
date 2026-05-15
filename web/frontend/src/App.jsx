@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { fetchConversations, fetchConversation, searchConversations } from './api.js';
 import Sidebar from './components/Sidebar.jsx';
 import ConversationView from './components/ConversationView.jsx';
+import Scene from './components/Scene.jsx';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -99,6 +100,29 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, [loadConversation]);
 
+  const closeConversation = useCallback(() => {
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
+    setActiveConvId(null);
+    setConversation(null);
+  }, []);
+
+  // Escape returns to home. Search query, sidebar state, and other filters
+  // are left untouched. Skip when focus is in a text input so the user can
+  // still hit Escape to dismiss native input behaviors.
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      if (!conversation) return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      closeConversation();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [conversation, closeConversation]);
+
   const handleSearch = useCallback(async (query) => {
     setSearchQuery(query);
     if (!query.trim()) {
@@ -116,6 +140,7 @@ export default function App() {
 
   return (
     <div className={`app ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+      <Scene />
       <Sidebar
         projects={projects}
         activeConvId={activeConvId}
@@ -135,7 +160,7 @@ export default function App() {
       )}
       <div className="main-content">
         {convLoading ? (
-          <div className="loading">Loading conversation</div>
+          <div className="loading">Summoning conversation</div>
         ) : conversation ? (
           <ConversationView
             conversation={conversation}
@@ -143,12 +168,13 @@ export default function App() {
           />
         ) : (
           <div className="empty-state">
+            <div>the veil is drawn —<br />select a spirit to commune with</div>
             <button
               className="mobile-menu-btn empty-state-menu"
               onClick={() => setSidebarOpen(true)}
               aria-label="Open conversations"
             >
-              &#9776; Browse conversations
+              &#9776; Summon the records
             </button>
           </div>
         )}

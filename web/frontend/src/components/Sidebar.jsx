@@ -164,7 +164,7 @@ export default function Sidebar({
     <div className="sidebar">
       <div className="sidebar-header">
         <div className="sidebar-title-row">
-          <h1>seance</h1>
+          <h1>séance</h1>
           {onClose && (
             <button
               className="sidebar-close-btn"
@@ -175,6 +175,7 @@ export default function Sidebar({
             </button>
           )}
         </div>
+        <div className="sidebar-tagline">✦ commune with conversations past ✦</div>
         <div className="search-box">
           <input
             type="text"
