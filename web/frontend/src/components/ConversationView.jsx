@@ -1,4 +1,39 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+
+function HeaderShareButton({ convId }) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef(null);
+
+  async function handleClick() {
+    const url = `${window.location.origin}/c/${encodeURIComponent(convId)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <button
+      className={`header-share-btn ${copied ? 'copied' : ''}`}
+      onClick={handleClick}
+      aria-label="Copy link to conversation"
+      title="Copy shareable link"
+    >
+      {copied ? '✓ Link copied' : '\u{1F517} Share link'}
+    </button>
+  );
+}
 
 function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString(undefined, {
@@ -112,6 +147,7 @@ export default function ConversationView({ conversation, onOpenSidebar }) {
             </button>
           )}
           <h2>{conversation.summary || conversation.id}</h2>
+          <HeaderShareButton convId={conversation.id} />
         </div>
         <div className="meta-bar">
           <span className="meta-cwd">{cwd}</span>

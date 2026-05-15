@@ -1,5 +1,45 @@
 import React, { useState, useRef } from 'react';
 
+function shareUrl(convId) {
+  return `${window.location.origin}/c/${encodeURIComponent(convId)}`;
+}
+
+function ShareButton({ convId }) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef(null);
+
+  async function handleClick(e) {
+    e.stopPropagation();
+    const url = shareUrl(convId);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopied(false), 1200);
+  }
+
+  return (
+    <button
+      className={`share-btn ${copied ? 'copied' : ''}`}
+      onClick={handleClick}
+      aria-label="Copy link to conversation"
+      title={copied ? 'Copied!' : 'Copy link'}
+    >
+      {copied ? '✓' : '\u{1F517}'}
+    </button>
+  );
+}
+
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   const now = new Date();
@@ -35,12 +75,15 @@ function ProjectGroup({ project, activeConvId, onSelectConversation, hideEmpty, 
           className={`conversation-item ${activeConvId === conv.id ? 'active' : ''}`}
           onClick={() => onSelectConversation(conv.id)}
         >
-          <div className="summary">{conv.summary || conv.id.slice(0, 8)}</div>
-          <div className="meta">
-            <span>{formatDate(conv.updatedAt)}</span>
-            <span>{conv.messageCount} msgs</span>
-            {conv.gitBranch && <span>{conv.gitBranch}</span>}
+          <div className="conversation-item-body">
+            <div className="summary">{conv.summary || conv.id.slice(0, 8)}</div>
+            <div className="meta">
+              <span>{formatDate(conv.updatedAt)}</span>
+              <span>{conv.messageCount} msgs</span>
+              {conv.gitBranch && <span>{conv.gitBranch}</span>}
+            </div>
           </div>
+          <ShareButton convId={conv.id} />
         </div>
       ))}
     </div>
@@ -60,14 +103,17 @@ function SearchResults({ results, onSelectConversation }) {
           className="search-result-item"
           onClick={() => onSelectConversation(result.conversationId)}
         >
-          <div className="match-text">{result.matchText}</div>
-          <div className="result-meta">
-            <span>{result.role}</span>
-            {' \u00b7 '}
-            <span>{formatDate(result.timestamp)}</span>
-            {' \u00b7 '}
-            <span>{result.project.split('/').pop()}</span>
+          <div className="search-result-body">
+            <div className="match-text">{result.matchText}</div>
+            <div className="result-meta">
+              <span>{result.role}</span>
+              {' \u00b7 '}
+              <span>{formatDate(result.timestamp)}</span>
+              {' \u00b7 '}
+              <span>{result.project.split('/').pop()}</span>
+            </div>
           </div>
+          <ShareButton convId={result.conversationId} />
         </div>
       ))}
     </div>
